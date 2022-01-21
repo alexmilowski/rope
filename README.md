@@ -1,2 +1,2 @@
-# roper
+# rope
 Redis Operator
