@@ -27,6 +27,7 @@ static_resources:
   clusters:
     - name: cluster_0
       lb_policy: CLUSTER_PROVIDED
+      dns_lookup_family: V4_ONLY
       load_assignment:
         cluster_name: cluster_0
         endpoints:
@@ -38,3 +39,10 @@ static_resources:
                   port_value: 6379
       cluster_type:
         name: envoy.clusters.redis
+        typed_config:
+          "@type": type.googleapis.com/google.protobuf.Struct
+          value:
+            cluster_refresh_rate: 30s
+            cluster_refresh_timeout: 0.5s
+            redirect_refresh_interval: 10s
+            redirect_refresh_threshold: 10
