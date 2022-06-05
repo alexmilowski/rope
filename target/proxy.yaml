@@ -5,17 +5,20 @@ metadata:
   labels:
     database: redis
     cluster: {name}
+    role: proxy
 spec:
   replicas: 1
   selector:
     matchLabels:
       database: redis
       cluster: {name}
+      role: proxy
   template:
     metadata:
       labels:
         database: redis
         cluster: {name}
+        role: proxy
     spec:
       serviceAccountName: redis
       affinity:
