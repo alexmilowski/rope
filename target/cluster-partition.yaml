@@ -1,0 +1,81 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-partition-{name}-{partition}
+  labels:
+    database: redis
+    # These are configurable
+    cluster: {name}
+    partition: {partition}
+spec:
+  selector:
+    matchLabels:
+      database: redis
+      # Same as object metadata
+      cluster: {name}
+      partition: {partition}
+  serviceName: redis
+  replicas: {replicas}
+  minReadySeconds: 2
+  template:
+    metadata:
+      labels:
+        database: redis
+      # Same as object metadata
+        cluster: {name}
+        partition: {partition}
+    spec:
+      terminationGracePeriodSeconds: 10
+      serviceAccountName: redis
+      affinity:
+        # This may be required for mixed-arch clusters
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: "kubernetes.io/arch"
+                  operator: NotIn
+                  values: ["arm64"]
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: redis-partition
+                    operator: In
+                    values:
+                    # This value must match the metadata partition value
+                    - {partition}
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+      # The image may be configurable
+      - image: redis:latest
+        name: redis
+        args: ["/conf/redis.conf"]
+        # The memory should match the requested storage
+        resources:
+          limits:
+            cpu: 1
+            memory: {memory}
+          requests:
+            cpu: 1
+            memory: {memory}
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: conf
+          mountPath: /conf
+      volumes:
+      - name: conf
+        configMap:
+          name: redis
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      # The storage class should be configurable
+      storageClassName: {storageClassName}
+      # The storage should be at least 2x the requested memory
+      resources:
+        requests:
+          storage: {storage}
