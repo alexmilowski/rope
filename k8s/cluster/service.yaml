@@ -1,0 +1,15 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  labels:
+    database: redis
+    cluster: c0
+spec:
+  selector:
+    database: redis
+    cluster: c0
+  clusterIP: None
+  ports:
+  - name: redis
+    port: 6379

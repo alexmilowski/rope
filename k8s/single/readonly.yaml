@@ -1,0 +1,16 @@
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis-readonly
+  labels:
+    database: redis
+    server: s0
+spec:
+  selector:
+    database: redis
+    server: s0
+  clusterIP: None
+  ports:
+  - name: redis
+    protocol: TCP
+    port: 6379

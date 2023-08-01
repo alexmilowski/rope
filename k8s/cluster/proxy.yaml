@@ -1,0 +1,50 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis-proxy
+  labels:
+    database: redis
+    cluster: c0
+    role: proxy
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      database: redis
+      cluster: c0
+      role: proxy
+  template:
+    metadata:
+      labels:
+        database: redis
+        cluster: c0
+        role: proxy
+    spec:
+      serviceAccountName: redis
+      affinity:
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: "kubernetes.io/arch"
+                  operator: NotIn
+                  values: ["arm64"]
+      containers:
+      - name: envoy
+        image: envoyproxy/envoy-dev:acbde44b695f7ba957e108a75ff77c8213b2ea95
+        ports:
+        - containerPort: 6379
+        resources:
+          requests:
+            memory: 500Mi
+            cpu: 1
+          limits:
+            memory: 1Gi
+            cpu: 1
+        volumeMounts:
+        - name: conf
+          mountPath: /etc/envoy
+      volumes:
+      - name: conf
+        configMap:
+          name: envoy-conf

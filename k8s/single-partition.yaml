@@ -1,0 +1,114 @@
+apiVersion: apps/v1
+kind: StatefulSet
+metadata:
+  name: redis-partition-{partition}
+  labels:
+    database: redis
+    server: s0
+    partition: {partition}
+    role: partition-shard
+spec:
+  selector:
+    matchLabels:
+      database: redis
+      # Same as object metadata
+      server: s0
+      partition: {partition}
+      role: partition-shard
+  serviceName: redis
+  replicas: {replicas}
+  minReadySeconds: 2
+  template:
+    metadata:
+      labels:
+        database: redis
+        # Same as object metadata
+        server: s0
+        partition: {partition}
+        role: partition-shard
+    spec:
+      terminationGracePeriodSeconds: 10
+      serviceAccountName: redis
+      affinity:
+        # This may be required for mixed-arch clusters
+        nodeAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            nodeSelectorTerms:
+              - matchExpressions:
+                - key: "kubernetes.io/arch"
+                  operator: NotIn
+                  values: ["arm64"]
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - labelSelector:
+                matchExpressions:
+                  - key: redis-partition
+                    operator: In
+                    values:
+                    # This value must match the metadata partition value
+                    - {partition}
+              topologyKey: "kubernetes.io/hostname"
+      containers:
+      # The image may be configurable
+      - image: redis/redis-stack-server:7.0.0-RC5
+        name: redis
+        env:
+        - name: CONFFILE
+          value: "/conf/redis.conf"
+        - name: POD_NAME
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.name
+        - name: POD_NAMESPACE
+          valueFrom:
+            fieldRef:
+              apiVersion: v1
+              fieldPath: metadata.namespace          
+        lifecycle:
+          postStart:
+            exec:
+              command:
+              - "/bin/bash"
+              - "-c"
+              - |-
+                set -e;
+                apt-get update -y;
+                apt-get install -y curl;
+                if [[ "$POD_NAME" == *-0 ]]; then
+                  curl -k -X PATCH --data '[{{"op":"add","path":"/metadata/labels/shard-role","value":"primary"}}]' -H "Content-Type:application/json-patch+json" -H "Authorization: Bearer $(</var/run/secrets/kubernetes.io/serviceaccount/token)" https://$KUBERNETES_SERVICE_HOST:$KUBERNETES_PORT_443_TCP_PORT/api/v1/namespaces/$POD_NAMESPACE/pods/$POD_NAME;
+                fi;
+        # The memory should match the requested storage
+        resources:
+          limits:
+            cpu: 1
+            memory: {memory}
+          requests:
+            cpu: 1
+            memory: {memory}
+        volumeMounts:
+        - name: data
+          mountPath: /data
+        - name: conf
+          mountPath: /conf
+        - name: redis-etc
+          mountPath: /etc/redis
+          readOnly: true
+      volumes:
+      - name: conf
+        configMap:
+          name: redis
+      - name: redis-etc
+        secret:
+          secretName: redis-etc
+  volumeClaimTemplates:
+  - metadata:
+      name: data
+    spec:
+      accessModes: ["ReadWriteOnce"]
+      # The storage class should be configurable
+      storageClassName: {storageClassName}
+      # The storage should be at least 2x the requested memory
+      resources:
+        requests:
+          storage: {storage}

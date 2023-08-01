@@ -1,0 +1,10 @@
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: redis
+data:
+  redis.conf: |
+    port 6379
+    appendonly yes
+    aclfile /etc/redis/users.acl
+    dir /data
